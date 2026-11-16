@@ -1,7 +1,7 @@
 {
   "name": "Foot Boutons Mondial",
   "short_name": "Foot Boutons",
-  "description": "Foot-boutons au tour par tour avec les 211 nations FIFA.",
+  "description": "Foot-boutons au tour par tour avec les 211 nations FIFA, contre l'IA ou à deux.",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",

@@ -94,7 +94,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .picker button[aria-pressed="true"] span{color:var(--fg)}
 .tabs{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px;gap:4px}
 .tabs button{flex:1;padding:10px;border-radius:9px;font-weight:500;font-size:14px;color:var(--muted)}
-.tabs button[aria-selected="true"]{background:var(--panel-2);color:var(--fg);box-shadow:0 0 0 1px var(--line) inset}
+.tabs button[aria-selected="true"],.tabs button[aria-pressed="true"]{background:var(--panel-2);color:var(--fg);box-shadow:0 0 0 1px var(--line) inset}
 .tier{display:flex;flex-direction:column;gap:6px}
 .tier h3{margin:6px 0 2px;display:flex;align-items:baseline;gap:8px;font-family:var(--display);font-weight:800;font-size:22px;text-transform:uppercase;letter-spacing:.02em}
 .tier h3 small{font-family:var(--body);font-weight:400;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0}
@@ -177,6 +177,12 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .card p{margin:0;color:var(--muted);font-size:14px}
 .btn{padding:14px;border-radius:12px;font-weight:700;font-size:15px;background:var(--panel-2);border:1px solid var(--line)}
 .btn.primary{background:var(--gold);color:#241900;border-color:var(--gold)}
+.setrow{display:flex;gap:8px}.setrow .btn{flex:1}.setrow .btn:first-child{flex:0 0 auto;padding-inline:16px}
+.setup.min>:not(.setrow){display:none}
+.setup.duo{top:auto;bottom:auto;top:50%;transform:translateY(-50%);left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px))}
+.setup.duo.min{width:auto}
+.stat{margin-top:4px;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stat b{color:var(--fg);font-weight:500}
 @media (prefers-reduced-motion:reduce){#banner{transition:none}}
 </style>
 
@@ -198,15 +204,16 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <div class="setup" id="setup" hidden>
       <p class="label">Ta tactique</p>
       <div class="forms" id="forms"></div>
-      <p class="note">Glisse tes boutons pour les placer où tu veux dans ta moitié.</p>
+      <div id="formsBWrap" hidden><p class="label" style="margin:0 0 10px">Tactique joueur 2</p><div class="forms" id="formsB"></div></div>
+      <p class="note" id="setNote">Glisse tes boutons pour les placer où tu veux dans ta moitié.</p>
       <div class="aiinfo" id="aiInfo"></div>
-      <button class="btn primary" id="kick">Coup d'envoi</button>
+      <div class="setrow"><button class="btn" id="setMin">Réduire</button><button class="btn primary" id="kick">Coup d'envoi</button></div>
     </div>
   </div>
 
   <section class="screen" id="menu">
     <div class="wrap">
-      <div class="brand"><div class="disc"></div><div><h1>Foot <em>Boutons</em></h1><p>Pichenette, rebond, but. Premier à 3 l'emporte.</p></div></div>
+      <div class="brand"><div class="disc"></div><div><h1>Foot <em>Boutons</em></h1><p>Pichenette, rebond, but. Contre l'IA ou à deux sur le même écran.</p></div></div>
       <div>
         <p class="label">Ton équipe</p>
         <div class="mine" id="mine"></div>
@@ -217,10 +224,12 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
         <button role="tab" id="tabTour" aria-selected="true">Tournée</button>
         <button role="tab" id="tabFree" aria-selected="false">Amical</button>
         <button role="tab" id="tabCup" aria-selected="false">Tournois</button>
+        <button role="tab" id="tabDuo" aria-selected="false">2 joueurs</button>
       </div>
+      <div id="goalWrap" hidden><p class="label">Durée du match</p><div class="tabs" id="goalSel"><button data-g="3">Premier à 3</button><button data-g="5">Premier à 5</button><button data-g="7">Premier à 7</button></div></div>
       <input class="search" id="oppQ" type="search" placeholder="Chercher un adversaire" autocomplete="off">
       <div id="levels" style="display:flex;flex-direction:column;gap:14px"></div>
-      <p class="note">211 nations membres de la FIFA. Le niveau de l'adversaire suit son rang au classement FIFA (approximatif, base fin 2026). En tournée, gagne 3 matchs dans un niveau pour débloquer le suivant : plus il est haut, plus l'IA vise juste et anticipe. Le rang règle aussi la puissance de frappe : un top 10 frappe environ 40 % plus fort qu'une petite nation. Avant le match, choisis ta tactique et place tes boutons.</p>
+      <p class="note">211 nations membres de la FIFA. Le niveau de l'adversaire suit son rang au classement FIFA (approximatif, base fin 2026). En tournée, gagne 3 matchs dans un niveau pour débloquer le suivant : plus il est haut, plus l'IA vise juste et anticipe. Le rang règle aussi la puissance de frappe : un top 10 frappe environ 40 % plus fort qu'une petite nation. Avant le match, choisis ta tactique et place tes boutons. En mode 2 joueurs, posez le téléphone à plat entre vous : le joueur 2 joue le camp du haut.</p>
     </div>
   </section>
 
@@ -476,6 +485,8 @@ const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v)
 let myCode=store.get('fb_team','FRA');if(!T[myCode])myCode='FRA';
 let progress=store.get('fb_prog',{});
 let mode='tour',soundOn=store.get('fb_sound',true);
+let goalsTo=store.get('fb_goals',3);if(![3,5,7].includes(goalsTo))goalsTo=3;
+let stats=store.get('fb_stats',{})||{};
 
 // ---------- Sound ----------
 let AC=null,lastTock=0;
@@ -501,9 +512,11 @@ function nextOpp(code){
   const top=pool.filter(t=>tierOf(t.r).lvl===open).sort((a,b)=>b.r-a.r);
   return top[0]||pool.sort((a,b)=>a.r-b.r)[0]||null;
 }
+function statLine(c){const s=stats[c];if(!s||!s.p)return'';
+  return`<div class="stat">Bilan : <b>${s.p}</b> match${s.p>1?'s':''} · <b>${s.w}</b> V · <b>${s.p-s.w}</b> D · buts <b>${s.gf}–${s.ga}</b>${s.best?` · meilleure série <b>${s.best}</b>`:''}</div>`}
 function buildMine(){
   const me=T[myCode];
-  $('mine').innerHTML=`<img src="${flagURL(myCode)}" alt=""><div class="t"><b>${me.n}</b><small>Rang FIFA ${me.r} · ${tierOf(me.r).name}</small><div class="pow">Force ${bars(powStars(me.r),'Force')}</div></div>`;
+  $('mine').innerHTML=`<img src="${flagURL(myCode)}" alt=""><div class="t"><b>${me.n}</b><small>Rang FIFA ${me.r} · ${tierOf(me.r).name}</small><div class="pow">Force ${bars(powStars(me.r),'Force')}</div>${statLine(myCode)}</div>`;
 }
 function buildPicker(){
   const q=norm($('teamQ').value.trim());
@@ -511,7 +524,9 @@ function buildPicker(){
   $('picker').innerHTML=list.length?list.map(t=>`<button data-c="${t.c}" aria-pressed="${t.c===myCode}" aria-label="${t.n}" title="${t.n}"><img src="${flagURL(t.c)}" alt=""><span>${t.c}</span></button>`).join(''):'<p class="note">Aucune nation trouvée.</p>';
 }
 function buildLevels(){
-  $('tabTour').setAttribute('aria-selected',mode==='tour');$('tabFree').setAttribute('aria-selected',mode==='free');$('tabCup').setAttribute('aria-selected',mode==='cup');
+  $('tabTour').setAttribute('aria-selected',mode==='tour');$('tabFree').setAttribute('aria-selected',mode==='free');$('tabCup').setAttribute('aria-selected',mode==='cup');$('tabDuo').setAttribute('aria-selected',mode==='duo');
+  $('goalWrap').hidden=!(mode==='free'||mode==='duo');$('goalSel').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.g===goalsTo));
+  $('oppQ').placeholder=mode==='duo'?'Équipe du joueur 2':'Chercher un adversaire';
   $('oppQ').hidden=mode==='cup';if(mode==='cup'){buildCups();return}
   const q=norm($('oppQ').value.trim());
   const{won,open}=tourState(myCode);
@@ -522,13 +537,13 @@ function buildLevels(){
     const all=order.filter(t=>tierOf(t.r)===tier);if(!all.length)continue;
     const locked=mode==='tour'&&tier.lvl>open;
     const nWon=all.filter(t=>won.includes(t.c)).length;
-    let info=`${tier.range} · ${all.length} nations`;
+    let info=`${tier.range} · ${all.length} nations`;if(mode==='duo')info+=' · équipe du joueur 2';
     if(mode==='tour')info=locked?`Bloqué · gagne ${NEED} matchs en niveau ${tier.lvl-1}`:`${nWon}/${all.length} battues`+(tier.lvl===open&&tier.lvl<TIERS.length&&nWon<NEED?` · ${NEED-nWon} victoire${NEED-nWon>1?'s':''} pour débloquer le niveau ${tier.lvl+1}`:'');
     html+=`<div class="tier"><h3><span class="lv">NIV. ${tier.lvl}</span>${tier.name}</h3><p class="note" style="margin:0 0 4px">${info}</p>`;
     if(!locked){
       const list=all.filter(t=>!q||norm(t.n).includes(q)||norm(t.c).includes(q));
       for(const t of list){const isWon=won.includes(t.c);
-        html+=`<button class="row" data-o="${t.c}"><img src="${flagURL(t.c)}" alt="" loading="lazy"><span class="nm">${t.n}${bars(powStars(t.r),'Force')}</span><span class="rk">#${t.r}</span>${isWon&&mode==='tour'?'<span class="st won">Battu</span>':'<span class="st play">Jouer</span>'}</button>`}
+        html+=`<button class="row" data-o="${t.c}"><img src="${flagURL(t.c)}" alt="" loading="lazy"><span class="nm">${t.n}${bars(powStars(t.r),'Force')}</span><span class="rk">#${t.r}</span>${isWon&&mode==='tour'?'<span class="st won">Battu</span>':`<span class="st play">${mode==='duo'?'Choisir':'Jouer'}</span>`}</button>`}
       if(q&&!list.length)html+='<p class="note">Aucune nation de ce niveau ne correspond.</p>';
     }
     html+='</div>';
@@ -543,7 +558,9 @@ $('oppQ').addEventListener('input',buildLevels);
 $('tabTour').onclick=()=>{mode='tour';buildLevels()};
 $('tabFree').onclick=()=>{mode='free';buildLevels()};
 $('tabCup').onclick=()=>{mode='cup';buildLevels()};
-$('levels').addEventListener('click',e=>{const b=e.target.closest('.row');if(!b||b.disabled)return;audio();startMatch(b.dataset.o)});
+$('tabDuo').onclick=()=>{mode='duo';buildLevels()};
+$('goalSel').addEventListener('click',e=>{const b=e.target.closest('button[data-g]');if(!b)return;goalsTo=+b.dataset.g;store.set('fb_goals',goalsTo);buildLevels()});
+$('levels').addEventListener('click',e=>{const b=e.target.closest('.row');if(!b||b.disabled)return;audio();startMatch(b.dataset.o,false,mode==='duo')});
 
 
 // ---------- Tournaments ----------
@@ -692,6 +709,7 @@ $('cupQuit').onclick=e=>{const q=e.currentTarget;if(!q.dataset.c){q.dataset.c=1;
 let G=null;
 const TURN_T=15;
 let myForm=store.get('fb_form',null);if(!Array.isArray(myForm)||myForm.length!==5)myForm=FORMS[0].p.map(a=>a.slice());
+let myFormB=store.get('fb_formB',null);if(!Array.isArray(myFormB)||myFormB.length!==5)myFormB=FORMS[0].p.map(a=>a.slice());
 function formId(f){const m=FORMS.find(F=>F.p.every((q,k)=>Math.abs(q[0]-f[k][0])<1&&Math.abs(q[1]-f[k][1])<1));return m?m.id:'perso'}
 function aiForm(){
   const ad=skill(T[G.b].r),pd=skill(T[G.a].r),diff=G.score[1]-G.score[0];let id;
@@ -699,17 +717,18 @@ function aiForm(){
   else id=pd>ad+.15&&Math.random()<.6?'3-1':['2-2','1-3','1-2-1','3-1'][Math.random()*4|0];
   G.formB=FORMS.find(f=>f.id===id);G.styleB=id==='3-1'?'def':id==='1-3'?'att':'bal';
 }
-function startMatch(opp,isCup){
-  G={a:myCode,b:opp,tier:aiParams(T[opp].r),pwA:strength(T[myCode].r),pwB:strength(T[opp].r),
+function startMatch(opp,isCup,duo){
+  duo=!!duo&&!isCup;
+  G={a:myCode,b:opp,duo,target:isCup||(mode==='tour'&&!duo)?3:goalsTo,tier:aiParams(T[opp].r),pwA:strength(T[myCode].r),pwB:strength(T[opp].r),
      B:null,score:[0,0],turn:0,phase:'setup',t:TURN_T,elapsed:0,aim:null,aiShot:null,phaseT:0,paused:false,wantSetup:false,cup:!!isCup};
-  $('cupScr').hidden=true;$('quit').textContent=isCup?'Abandonner (défaite 0–3)':'Abandonner le match';
+  $('cupScr').hidden=true;$('quit').textContent=isCup?`Abandonner (défaite 0–${G.target})`:'Abandonner le match';$('setup').classList.remove('min');$('setMin').textContent='Réduire';
   sprites={};resize();
   $('chipA').querySelector('img').src=flagURL(myCode);$('chipA').querySelector('b').textContent=myCode;
   $('chipB').querySelector('img').src=flagURL(opp);$('chipB').querySelector('b').textContent=opp;
   $('menu').hidden=true;$('end').hidden=true;$('pause').hidden=true;
   enterSetup(Math.random()<.5?0:1);updateHud();
 }
-function placeKick(){aiForm();G.B=kickoff(myForm,G.formB.p)}
+function placeKick(){if(G.duo){G.formB={id:formId(myFormB),name:''};G.styleB='bal';G.B=kickoff(myForm,myFormB)}else{aiForm();G.B=kickoff(myForm,G.formB.p)}}
 function enterSetup(kickTo){
   G.kickTo=kickTo;G.phase='setup';G.wantSetup=false;placeKick();
   $('chipA').classList.remove('turn');$('chipB').classList.remove('turn');$('skip').hidden=true;hint('');
@@ -718,48 +737,65 @@ function enterSetup(kickTo){
 function renderSetup(){
   const cur=formId(myForm),opp=T[G.b],tr=tierOf(opp.r);
   $('forms').innerHTML=FORMS.map(f=>`<button data-f="${f.id}" aria-pressed="${f.id===cur}"><b>${f.id}</b><span>${f.name}</span></button>`).join('')+(cur==='perso'?'<button aria-pressed="true" disabled><b>Perso</b><span>Sur mesure</span></button>':'');
+  $('setup').classList.toggle('duo',G.duo);$('formsBWrap').hidden=!G.duo;
+  $('setNote').textContent=G.duo?'Chaque joueur glisse ses boutons dans sa moitié. Réduis ce panneau pour voir tout le terrain.':'Glisse tes boutons pour les placer où tu veux dans ta moitié.';
+  if(G.duo){const cb=formId(myFormB);
+    $('formsB').innerHTML=FORMS.map(f=>`<button data-f="${f.id}" aria-pressed="${f.id===cb}"><b>${f.id}</b><span>${f.name}</span></button>`).join('')+(cb==='perso'?'<button aria-pressed="true" disabled><b>Perso</b><span>Sur mesure</span></button>':'');
+    $('aiInfo').innerHTML=`<img src="${flagURL(opp.c)}" alt=""><span><b>Joueur 2 · ${opp.n}</b> · rang ${opp.r}<br>Camp du haut · frappe ${bars(powStars(opp.r),'Frappe')}</span>`;
+    $('kick').textContent=G.kickTo===0?`Coup d'envoi (J1 · ${G.a})`:`Coup d'envoi (J2 · ${G.b})`;return}
   $('aiInfo').innerHTML=`<img src="${flagURL(opp.c)}" alt=""><span><b>${opp.n}</b> · ${tr.name} · rang ${opp.r}<br>Aligné en <b>${G.formB.id} ${G.formB.name}</b> · précision ${bars(powStars(opp.r),'Précision')}</span>`;
   $('kick').textContent=G.kickTo===0?"Coup d'envoi (à toi)":`Coup d'envoi (${opp.c})`;
 }
 function applyForm(f){myForm=f.map(a=>a.slice());let k=0;for(const b of G.B)if(b.team===0){b.x=myForm[k][0];b.y=H-myForm[k][1];k++}renderSetup()}
+function applyFormB(f){myFormB=f.map(a=>a.slice());let k=0;for(const b of G.B)if(b.team===1){b.x=W-myFormB[k][0];b.y=myFormB[k][1];k++}renderSetup()}
+$('formsB').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(!b||!G)return;applyFormB(FORMS.find(f=>f.id===b.dataset.f).p)});
+$('setMin').onclick=()=>{const m=$('setup').classList.toggle('min');$('setMin').textContent=m?'Tactique':'Réduire'};
 $('forms').addEventListener('click',e=>{const b=e.target.closest('button[data-f]');if(!b||!G)return;applyForm(FORMS.find(f=>f.id===b.dataset.f).p)});
-$('kick').onclick=()=>{if(!G||G.phase!=='setup')return;store.set('fb_form',myForm);$('setup').hidden=true;setTurn(G.kickTo)};
+$('kick').onclick=()=>{if(!G||G.phase!=='setup')return;store.set('fb_form',myForm);if(G.duo)store.set('fb_formB',myFormB);$('setup').hidden=true;setTurn(G.kickTo)};
 function dragTo(i,x,y){
-  const b=G.B[i];x=Math.max(DR,Math.min(W-DR,x));y=Math.max(H/2+DR,Math.min(H-DR,y));
+  const b=G.B[i],y0=b.team===0?H/2+DR:DR,y1=b.team===0?H-DR:H/2-DR;x=Math.max(DR,Math.min(W-DR,x));y=Math.max(y0,Math.min(y1,y));
   for(let it=0;it<4;it++){
     const cx=x-W/2,cy=y-H/2,cd=Math.hypot(cx,cy);if(cd<CC+DR){const k=(CC+DR)/(cd||1);x=W/2+(cd?cx:0)*k;y=H/2+(cd?cy:1)*k}
     for(const o of G.B){if(o===b||o.team<0)continue;const dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);if(d<2*DR){const k=2*DR/(d||1);x=o.x+(d?dx:1)*k;y=o.y+(d?dy:0)*k}}
-    x=Math.max(DR,Math.min(W-DR,x));y=Math.max(H/2+DR,Math.min(H-DR,y));
+    x=Math.max(DR,Math.min(W-DR,x));y=Math.max(y0,Math.min(y1,y));
   }
   b.x=x;b.y=y;
 }
 function setTurn(t){
   G.turn=t;G.t=TURN_T;G.aim=null;
-  if(t===0){G.phase='aim';hint('Tire en arrière un de tes boutons, puis relâche')}
+  if(G.duo){G.phase='aim';hint(t===0?`Joueur 1 · ${G.a} : tire en arrière un bouton du bas`:`Joueur 2 · ${G.b} : tire en arrière un bouton du haut`)}
+  else if(t===0){G.phase='aim';hint('Tire en arrière un de tes boutons, puis relâche')}
   else{G.phase='aithink';G.phaseT=.55;hint(`${G.b} réfléchit…`)}
   $('chipA').classList.toggle('turn',t===0);$('chipB').classList.toggle('turn',t===1);
-  $('skip').hidden=t!==0;
+  $('skip').hidden=t!==0&&!G.duo;
 }
 function hint(s){$('hint').textContent=s}
 function shoot(i,dx,dy,p,pw){const b=G.B[i];b.vx=dx*VMAX*pw*p;b.vy=dy*VMAX*pw*p;G.phase='moving';G.phaseT=0;G.mover=G.turn;hint('');$('skip').hidden=true;tone(300,.08,.2,'square')}
 function fmt(s){s=Math.floor(s);return`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`}
 function updateHud(){
   $('sA').textContent=G.score[0];$('sB').textContent=G.score[1];
-  $('sub').textContent=`Premier à 3 · ${fmt(G.elapsed)}`;
+  $('sub').textContent=`Premier à ${G.target} · ${fmt(G.elapsed)}`;
   const frac=G.phase==='aim'?G.t/TURN_T:1;
   $('ring').style.strokeDashoffset=(106.8*(1-frac)).toFixed(1);
   $('ring').style.stroke=frac<.3?'#E5484D':'#47C27A';
-  $('clockN').textContent=G.phase==='aim'?Math.ceil(G.t):G.turn===1?'…':'·';
+  $('clockN').textContent=G.phase==='aim'?Math.ceil(G.t):G.turn===1&&!G.duo?'…':'·';
 }
 function goal(scorer){
   G.score[scorer]++;G.phase='goal';G.phaseT=1.7;G.scorer=scorer;
-  $('banner').textContent=scorer===0?'BUT !':'BUT…';$('banner').classList.add('on');
+  $('banner').textContent=scorer===0||G.duo?'BUT !':'BUT…';$('banner').classList.add('on');
   tone(660,.25,.25,'square');tone(880,.4,.25,'square',.18);
   if(navigator.vibrate)try{navigator.vibrate(scorer===0?[60,40,120]:80)}catch(e){}
   updateHud();
 }
 function endMatch(){
   G.phase='over';const win=G.score[0]>G.score[1];
+  if(G.duo){const w=win?G.a:G.b;
+    $('endT').textContent=win?'Joueur 1':'Joueur 2';$('endT').style.color='var(--gold)';
+    $('endA').src=flagURL(G.a);$('endB').src=flagURL(G.b);$('endS').textContent=`${G.score[0]} – ${G.score[1]}`;
+    $('endP').textContent=`${T[w].n} gagne le duel en ${fmt(G.elapsed)}. Revanche ?`;
+    G.next=null;$('endNext').hidden=true;$('endAgain').hidden=false;$('endAgain').textContent='Revanche';$('endCup').hidden=true;$('end').hidden=false;return}
+  $('endAgain').textContent='Rejouer';
+  {const s=stats[G.a]||{p:0,w:0,gf:0,ga:0,run:0,best:0};s.p++;s.gf+=G.score[0];s.ga+=G.score[1];if(win){s.w++;s.run=(s.run||0)+1;s.best=Math.max(s.best||0,s.run)}else s.run=0;stats[G.a]=s;store.set('fb_stats',stats)}
   if(win&&!G.cup){const w=progress[G.a]||[];if(!w.includes(G.b))w.push(G.b);progress[G.a]=w;store.set('fb_prog',progress)}
   $('endT').textContent=win?'Victoire':'Défaite';$('endT').style.color=win?'var(--gold)':'var(--fg)';
   $('endA').src=flagURL(G.a);$('endB').src=flagURL(G.b);$('endS').textContent=`${G.score[0]} – ${G.score[1]}`;
@@ -774,33 +810,37 @@ function endMatch(){
 }
 $('endCup').onclick=()=>{$('end').hidden=true;G=null;showCup()};
 $('endNext').onclick=()=>startMatch(G.next);
-$('endAgain').onclick=()=>startMatch(G.b);
-$('endMenu').onclick=()=>{$('end').hidden=true;if(G&&G.cup)mode='cup';G=null;buildMenu();$('menu').hidden=false};
+$('endAgain').onclick=()=>startMatch(G.b,false,G.duo);
+$('endMenu').onclick=()=>{$('end').hidden=true;if(G&&G.cup)mode='cup';if(G&&G.duo)mode='duo';G=null;buildMenu();$('menu').hidden=false};
 $('pauseBtn').onclick=()=>{if(!G||G.phase==='over'||G.phase==='setup')return;G.paused=true;$('pause').hidden=false};
 $('tacBtn').onclick=()=>{if(!G)return;G.paused=false;$('pause').hidden=true;G.wantSetup=true;hint('Nouvelle tactique au prochain engagement')};
 $('resume').onclick=()=>{G.paused=false;$('pause').hidden=true};
-$('quit').onclick=()=>{$('pause').hidden=true;if(G&&G.cup&&CUP){cupRecord(0,3);G=null;showCup();return}G=null;buildMenu();$('menu').hidden=false};
+$('quit').onclick=()=>{$('pause').hidden=true;if(G&&G.cup&&CUP){cupRecord(0,G.target);G=null;showCup();return}G=null;buildMenu();$('menu').hidden=false};
 const syncSound=()=>$('soundBtn').textContent='Son : '+(soundOn?'activé':'coupé');syncSound();
 $('soundBtn').onclick=()=>{soundOn=!soundOn;store.set('fb_sound',soundOn);syncSound()};
-$('skip').onclick=()=>{if(G&&G.phase==='aim'){G.aim=null;setTurn(1)}};
+$('skip').onclick=()=>{if(G&&G.phase==='aim'){G.aim=null;setTurn(1-G.turn)}};
 
 // ---------- Input ----------
 function toWorld(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left-view.ox)/view.s,y:(e.clientY-r.top-view.oy)/view.s}}
 cv.addEventListener('pointerdown',e=>{
   audio();if(!G||G.paused)return;
-  if(G.phase==='setup'){const p=toWorld(e);let bi=-1,bd=DR*1.3;G.B.forEach((b,i)=>{if(b.team!==0)return;const d=Math.hypot(b.x-p.x,b.y-p.y);if(d<bd){bd=d;bi=i}});
+  if(G.phase==='setup'){const p=toWorld(e);let bi=-1,bd=DR*1.3;G.B.forEach((b,i)=>{if(b.team<0||(b.team===1&&!G.duo))return;const d=Math.hypot(b.x-p.x,b.y-p.y);if(d<bd){bd=d;bi=i}});
     if(bi>=0){cv.setPointerCapture(e.pointerId);G.drag={i:bi,ox:G.B[bi].x-p.x,oy:G.B[bi].y-p.y}}return}
   if(G.phase!=='aim')return;
   const p=toWorld(e);let best=-1,bd=DR*1.6;
-  G.B.forEach((b,i)=>{if(b.team!==0)return;const d=Math.hypot(b.x-p.x,b.y-p.y);if(d<bd){bd=d;best=i}});
+  const me=G.duo?G.turn:0;
+  G.B.forEach((b,i)=>{if(b.team!==me)return;const d=Math.hypot(b.x-p.x,b.y-p.y);if(d<bd){bd=d;best=i}});
   if(best<0)return;cv.setPointerCapture(e.pointerId);G.aim={i:best,px:p.x,py:p.y};
 });
 cv.addEventListener('pointermove',e=>{if(G&&G.drag){const p=toWorld(e);dragTo(G.drag.i,p.x+G.drag.ox,p.y+G.drag.oy);return}if(G&&G.aim){const p=toWorld(e);G.aim.px=p.x;G.aim.py=p.y}});
 function release(e,cancel){
-  if(G&&G.drag){G.drag=null;myForm=G.B.filter(b=>b.team===0).map(b=>[Math.round(b.x),Math.round(H-b.y)]);renderSetup();return}
+  if(G&&G.drag){const tm=G.B[G.drag.i].team;G.drag=null;
+    if(tm===0)myForm=G.B.filter(b=>b.team===0).map(b=>[Math.round(b.x),Math.round(H-b.y)]);
+    else myFormB=G.B.filter(b=>b.team===1).map(b=>[Math.round(W-b.x),Math.round(b.y)]);
+    renderSetup();return}
   if(!G||!G.aim)return;const a=G.aim;G.aim=null;if(cancel||G.phase!=='aim')return;
   const b=G.B[a.i];let dx=b.x-a.px,dy=b.y-a.py;const l=Math.hypot(dx,dy);
-  if(l<14)return;shoot(a.i,dx/l,dy/l,Math.min(l,MAXPULL)/MAXPULL,G.pwA);
+  if(l<14)return;shoot(a.i,dx/l,dy/l,Math.min(l,MAXPULL)/MAXPULL,G.turn===0?G.pwA:G.pwB);
 }
 cv.addEventListener('pointerup',e=>release(e,false));
 cv.addEventListener('pointercancel',e=>release(e,true));
@@ -858,8 +898,8 @@ function draw(){
   // shadows
   c.fillStyle='rgba(0,0,0,.28)';for(const b of B){c.beginPath();c.ellipse(b.x+3,b.y+5,b.r,b.r*.92,0,0,7);c.fill()}
   // active glow
-  if(G&&G.phase==='setup'){c.fillStyle='rgba(255,255,255,.07)';c.fillRect(0,H/2,W,H/2);c.save();c.setLineDash([6,8]);c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=2.5;for(const b of B)if(b.team===0){c.beginPath();c.arc(b.x,b.y,DR+6,0,7);c.stroke()}c.restore()}
-  if(G&&G.phase==='aim'){const pulse=.5+.5*Math.sin(performance.now()/260);c.strokeStyle=`rgba(242,193,78,${.35+.4*pulse})`;c.lineWidth=3;for(const b of B)if(b.team===0){c.beginPath();c.arc(b.x,b.y,DR+5,0,7);c.stroke()}}
+  if(G&&G.phase==='setup'){c.fillStyle='rgba(255,255,255,.07)';c.fillRect(0,H/2,W,H/2);if(G.duo)c.fillRect(0,0,W,H/2);c.save();c.setLineDash([6,8]);c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=2.5;for(const b of B)if(b.team===0||(G.duo&&b.team===1)){c.beginPath();c.arc(b.x,b.y,DR+6,0,7);c.stroke()}c.restore()}
+  if(G&&G.phase==='aim'){const pulse=.5+.5*Math.sin(performance.now()/260);c.strokeStyle=`rgba(242,193,78,${.35+.4*pulse})`;c.lineWidth=3;for(const b of B)if(b.team===(G.duo?G.turn:0)){c.beginPath();c.arc(b.x,b.y,DR+5,0,7);c.stroke()}}
   for(const b of B){
     if(b.team<0){c.fillStyle='#fff';c.beginPath();c.arc(b.x,b.y,BR,0,7);c.fill();c.strokeStyle='#222';c.lineWidth=2;c.stroke();
       c.fillStyle='#222';c.beginPath();c.arc(b.x,b.y,4.5,0,7);c.fill();continue}
@@ -882,7 +922,7 @@ function loop(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
   if(G&&!G.paused&&G.phase!=='over'){
     G.elapsed+=dt;
-    if(G.phase==='aim'){G.t-=dt;if(G.t<=0){G.aim=null;setTurn(1)}}
+    if(G.phase==='aim'){G.t-=dt;if(G.t<=0){G.aim=null;setTurn(1-G.turn)}}
     else if(G.phase==='aithink'){G.phaseT-=dt;if(G.phaseT<=0){G.aiShot=aiChoose(G.B,G.tier,G.pwB,G.styleB);G.phase='aiaim';G.phaseT=.7}}
     else if(G.phase==='aiaim'){G.phaseT-=dt;if(G.phaseT<=0){const a=G.aiShot;shoot(a.i,a.dx,a.dy,a.p,G.pwB);G.aiShot=null}}
     else if(G.phase==='moving'){
@@ -891,7 +931,7 @@ function loop(now){
       if(G.phase==='moving'&&(still(G.B)||G.phaseT>14)){for(const b of G.B){b.vx=0;b.vy=0}setTurn(1-G.mover)}
     }
     else if(G.phase==='goal'){G.phaseT-=dt;if(G.phaseT<=0){$('banner').classList.remove('on');
-      if(G.score[G.scorer]>=3)endMatch();else if(G.wantSetup)enterSetup(1-G.scorer);else{placeKick();setTurn(1-G.scorer)}}}
+      if(G.score[G.scorer]>=G.target)endMatch();else if(G.wantSetup)enterSetup(1-G.scorer);else{placeKick();setTurn(1-G.scorer)}}}
     updateHud();
   }
   draw();requestAnimationFrame(loop);
